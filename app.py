@@ -1,64 +1,55 @@
 import streamlit as st
-import tempfile
-import os
-import json
+import os, uuid, cv2, shutil, json, subprocess
 import pandas as pd
-import subprocess
-from extract_frame import extract_frames_from_video
+from utils import extract_frames_from_video
 
-st.set_page_config(page_title="SpeciesNet Video Analyzer")
-st.title("🎥🐾 SpeciesNet Video Analyzer")
-st.markdown("Upload a folder of `.mp4` videos (select all videos inside your folder) to detect animal species.")
+# Define paths
+UPLOAD_DIR = "uploaded_videos"
+FRAME_DIR = "extracted_frames"
+PRED_JSON = "output/predictions.json"
+PRED_CSV = "output/predictions.csv"
 
-# Upload multiple video files (simulate folder upload)
+# Create folders
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(FRAME_DIR, exist_ok=True)
+os.makedirs("output", exist_ok=True)
+
+st.title("🐆 Animal Species Detection (SpeciesNet)")
+st.write("Upload camera trap videos and detect species.")
+
+# Upload videos
 uploaded_files = st.file_uploader("Upload .mp4 videos", type=["mp4"], accept_multiple_files=True)
 
 if uploaded_files:
-    if st.button("Run Species Detection"):
-        with st.spinner("Processing videos and predicting species..."):
+    if st.button("Run SpeciesNet"):
+        # Clean previous data
+        shutil.rmtree(UPLOAD_DIR)
+        shutil.rmtree(FRAME_DIR)
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        os.makedirs(FRAME_DIR, exist_ok=True)
 
-            with tempfile.TemporaryDirectory() as video_dir, tempfile.TemporaryDirectory() as frames_dir:
-                # Save uploaded videos
-                for uploaded_file in uploaded_files:
-                    video_path = os.path.join(video_dir, uploaded_file.name)
-                    with open(video_path, "wb") as f:
-                        f.write(uploaded_file.read())
+        for uploaded_file in uploaded_files:
+            video_id = str(uuid.uuid4())
+            video_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
+            with open(video_path, "wb") as f:
+                f.write(uploaded_file.read())
+            extract_frames_from_video(video_path, video_id, FRAME_DIR)
 
-                    # Extract frames from each video
-                    extract_frames_from_video((video_path, frames_dir))
+        # Run SpeciesNet
+        command = f"python -m speciesnet.scripts.run_model --folders {FRAME_DIR} --predictions_json {PRED_JSON} --country IND"
+        subprocess.run(command, shell=True)
 
-                # Output path for predictions
-                output_json = os.path.join(frames_dir, "speciesnet_output.json")
+        # Parse JSON
+        with open(PRED_JSON, 'r') as f:
+            data = json.load(f)
+        results = []
+        for item in data["predictions"]:
+            species = item.get("prediction", "Unknown")
+            video_name = os.path.basename(item["filepath"]).split('_')[0]
+            results.append((video_name, species))
+        df = pd.DataFrame(results, columns=["Video", "Species"]).drop_duplicates()
+        df.to_csv(PRED_CSV, index=False)
 
-                # Run the SpeciesNet model
-                subprocess.run([
-                    "python", "-m", "speciesnet.scripts.run_model",
-                    "--folders", frames_dir,
-                    "--predictions_json", output_json,
-                    "--country", "IND"
-                ], check=True)
-
-                # Load predictions
-                with open(output_json, 'r') as f:
-                    predictions = json.load(f)["predictions"]
-
-                # Match predictions back to video
-                video_to_species = {}
-                for item in predictions:
-                    img_file = os.path.basename(item["filepath"])
-                    video_name = "_".join(img_file.split("_")[:-1]) + ".mp4"
-                    species = item.get("prediction", "N/A")
-                    video_to_species.setdefault(video_name, set()).add(species)
-
-                # Display results
-                data = [{"Video File": vid, "Detected Species": ", ".join(species)} for vid, species in video_to_species.items()]
-                df = pd.DataFrame(data)
-                st.success("✅ Detection complete!")
-                st.dataframe(df)
-
-                # Download buttons
-                csv = df.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Download CSV", csv, file_name="speciesnet_results.csv", mime="text/csv")
-
-                with open(output_json, 'rb') as f:
-                    st.download_button("📄 Download Raw JSON", f, file_name="speciesnet_output.json", mime="application/json")
+        st.success("Detection Complete!")
+        st.dataframe(df)
+        st.download_button("Download CSV", df.to_csv(index=False), "species_predictions.csv", "text/csv")
