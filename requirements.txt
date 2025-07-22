@@ -1,4 +1,0 @@
-streamlit
-opencv-python
-pandas
-git+https://github.com/ecologize/speciesnet.git
