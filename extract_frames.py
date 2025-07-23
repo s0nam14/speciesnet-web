@@ -22,12 +22,16 @@ def extract_all_frames(video_paths, output_folder):
         for frame_num in range(0, total_frames, frame_interval):
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             success, frame = cap.read()
-            if not success:
-                break
+            if not success or frame is None:
+                print(f"Skipping frame {frame_num} in {video_path} — failed to read.")
+                continue
             frame_count += 1
             frame_filename = f"{video_name}_{frame_count:04d}.jpg"
             frame_path = os.path.join(output_folder, frame_filename)
-            cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            all_frames.append(frame_path)
+            try:
+                cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                all_frames.append(frame_path)
+            except Exception as e:
+                print(f"Failed to write frame to {frame_path}: {e}")
         cap.release()
     return all_frames
