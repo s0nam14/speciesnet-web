@@ -1,3 +1,4 @@
+# speciesnet_runner.py
 import subprocess
 
 def run_speciesnet_on_frames(frames_folder, json_output_path):
@@ -10,7 +11,6 @@ def run_speciesnet_on_frames(frames_folder, json_output_path):
 
     result = subprocess.run(command, capture_output=True, text=True)
 
-    # Print logs for debugging on Streamlit Cloud
     print("SpeciesNet STDOUT:\n", result.stdout)
     print("SpeciesNet STDERR:\n", result.stderr)
 
