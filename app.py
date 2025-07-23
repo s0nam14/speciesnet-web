@@ -29,7 +29,12 @@ if st.button("Run Detection"):
                 video_paths.append(file_path)
 
             st.info("Extracting frames...")
-            extracted_frames = extract_all_frames(video_paths, temp_output_dir)
+            try:
+                extracted_frames = extract_all_frames(video_paths, temp_output_dir)
+            except Exception as e:
+                st.error("Frame extraction failed. Check logs for details.")
+                st.text(str(e))
+                raise
 
             if not extracted_frames:
                 st.error("No frames extracted. Check your video files.")
