@@ -1,17 +1,22 @@
 import json
-import csv
-import os
+import pandas as pd
 
-def generate_csv(json_path, csv_path):
-    with open(json_path) as f:
+def parse_predictions_to_csv(json_file, csv_file):
+    with open(json_file, "r") as f:
         data = json.load(f)
 
-    preds = data.get("predictions", [])
-    with open(csv_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["Video", "Species Prediction"])
-        for p in preds:
-            filepath = p.get("filepath", "")
-            video = os.path.basename(filepath).split("_")[0] + ".mp4"
-            prediction = p.get("classifications", {}).get("classes", ["Unknown"])[0]
-            writer.writerow([video, prediction])
+    rows = []
+    for pred in data.get("predictions", []):
+        filepath = pred.get("filepath", "")
+        classes = pred.get("classifications", {}).get("classes", [])
+        # You can customize extraction as needed; here we take top class only
+        top_class = classes[0] if classes else "Unknown"
+        video_name = filepath.split('_')[0]  # assuming filename format videoName_XXXX.jpg
+        rows.append({
+            "video": video_name,
+            "predicted_class": top_class
+        })
+
+    df = pd.DataFrame(rows)
+    df.to_csv(csv_file, index=False)
+    return df
