@@ -1,3 +1,4 @@
+# results_parser.py
 import json
 import pandas as pd
 
@@ -9,9 +10,8 @@ def parse_predictions_to_csv(json_file, csv_file):
     for pred in data.get("predictions", []):
         filepath = pred.get("filepath", "")
         classes = pred.get("classifications", {}).get("classes", [])
-        # You can customize extraction as needed; here we take top class only
         top_class = classes[0] if classes else "Unknown"
-        video_name = filepath.split('_')[0]  # assuming filename format videoName_XXXX.jpg
+        video_name = filepath.split('_')[0]
         rows.append({
             "video": video_name,
             "predicted_class": top_class
